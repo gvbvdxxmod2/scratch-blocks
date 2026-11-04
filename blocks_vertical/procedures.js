@@ -58,6 +58,7 @@ Blockly.ScratchBlocks.ProcedureUtils.callerDomToMutation = function(xmlElement) 
       JSON.parse(xmlElement.getAttribute('generateshadows'));
   this.argumentIds_ = JSON.parse(xmlElement.getAttribute('argumentids'));
   this.warp_ = JSON.parse(xmlElement.getAttribute('warp'));
+  this.cBlockColor_ = JSON.parse(xmlElement.getAttribute('blockcolor'));
   this.updateDisplay_();
 };
 
@@ -82,6 +83,7 @@ Blockly.ScratchBlocks.ProcedureUtils.definitionMutationToDom = function(
   container.setAttribute('argumentdefaults',
       JSON.stringify(this.argumentDefaults_));
   container.setAttribute('warp', JSON.stringify(this.warp_));
+  container.setAttribute('blockcolor', JSON.stringify(this.cBlockColor_));
   return container;
 };
 
@@ -94,6 +96,15 @@ Blockly.ScratchBlocks.ProcedureUtils.definitionMutationToDom = function(
 Blockly.ScratchBlocks.ProcedureUtils.definitionDomToMutation = function(xmlElement) {
   this.procCode_ = xmlElement.getAttribute('proccode');
   this.warp_ = JSON.parse(xmlElement.getAttribute('warp'));
+  try{
+    this.cBlockColor_ = JSON.parse(xmlElement.getAttribute('blockcolor'));
+  }catch(e){
+    this.cBlockColor_ = null;
+  }
+  if (this.cBlockColor_) {
+    this.setColour(this.cBlockColor_);
+  }
+
 
   var prevArgIds = this.argumentIds_;
   var prevDisplayNames = this.displayNames_;
@@ -657,6 +668,10 @@ Blockly.ScratchBlocks.ProcedureUtils.getWarp = function() {
   return this.warp_;
 };
 
+Blockly.ScratchBlocks.ProcedureUtils.getCColor = function() {
+  return this.cBlockColor_;
+};
+
 /**
  * Externally-visible function to set the warp on procedure declaration.
  * @param {boolean} warp The value of the warp_ property.
@@ -664,6 +679,15 @@ Blockly.ScratchBlocks.ProcedureUtils.getWarp = function() {
  */
 Blockly.ScratchBlocks.ProcedureUtils.setWarp = function(warp) {
   this.warp_ = warp;
+};
+
+Blockly.ScratchBlocks.ProcedureUtils.setCColor = function(color) {
+  this.cBlockColor_ = color;
+  if (this.cBlockColor_) {
+    if (this.setColour) {
+      this.setColour(this.cBlockColor_);
+    }
+  }
 };
 
 /**
@@ -799,6 +823,7 @@ Blockly.Blocks['procedures_call'] = {
     this.procCode_ = '';
     this.argumentIds_ = [];
     this.warp_ = false;
+    this.cBlockColor_ = null;
   },
   // Shared.
   getProcCode: Blockly.ScratchBlocks.ProcedureUtils.getProcCode,
@@ -836,6 +861,7 @@ Blockly.Blocks['procedures_prototype'] = {
     this.argumentIds_ = [];
     this.argumentDefaults_ = [];
     this.warp_ = false;
+    this.cBlockColor_ = null;
   },
   // Shared.
   getProcCode: Blockly.ScratchBlocks.ProcedureUtils.getProcCode,
@@ -871,6 +897,7 @@ Blockly.Blocks['procedures_declaration'] = {
     this.argumentIds_ = [];
     this.argumentDefaults_ = [];
     this.warp_ = false;
+    this.cBlockColor_ = null;
   },
   // Shared.
   getProcCode: Blockly.ScratchBlocks.ProcedureUtils.getProcCode,
