@@ -98,6 +98,7 @@ Blockly.Colours = {
   "toolboxHover": "#4C97FF",
   "toolboxSelected": "#e9eef2",
   "toolboxText": "#575E75",
+  "blackText": "#575E75",
   "toolbox": "#FFFFFF",
   "flyout": "#F9F9F9",
   "scrollbar": "#CECDCE",
@@ -123,7 +124,23 @@ Blockly.Colours = {
   "numPadText": "white", // Do not use hex here, it cannot be inlined with data-uri SVG
   "valueReportBackground": "#FFFFFF",
   "valueReportBorder": "#AAAAAA",
-  "menuHover": "rgba(0, 0, 0, 0.2)"
+  "valueReportForeground": "#000000",
+  "menuHover": "rgba(0, 0, 0, 0.2)",
+  "contextMenuBackground": "#ffffff",
+  "contextMenuBorder": "#cccccc",
+  "contextMenuForeground": "#000000",
+  "contextMenuActiveBackground": "#d6e9f8",
+  "contextMenuDisabledForeground": "#cccccc",
+  "flyoutLabelColor": "#575E75",
+  "checkboxInactiveBackground": "#ffffff",
+  "checkboxInactiveBorder": "#c8c8c8",
+  "checkboxActiveBackground": "#4C97FF",
+  "checkboxActiveBorder": "#3373CC",
+  "checkboxCheck": "#ffffff",
+  "buttonActiveBackground": "#ffffff",
+  "buttonForeground": "#575E75",
+  "buttonBorder": "#c6c6c6",
+  "zoomIconFilter": "none"
 };
 
 /**

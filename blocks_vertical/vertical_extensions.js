@@ -210,13 +210,28 @@ Blockly.ScratchBlocks.VerticalExtensions.PROCEDURE_CALL_CONTEXTMENU = {
    */
   customContextMenu: function(menuOptions) {
     menuOptions.push(Blockly.Procedures.makeEditOption(this));
+    if (
+      !this.isInFlyout &&
+      Blockly.Procedures.USER_CAN_CHANGE_CALL_TYPE &&
+      this.workspace.procedureReturnsEnabled
+    ) {
+      menuOptions.push(Blockly.Procedures.makeChangeTypeOption(this));
+    }
   }
 };
 
+Blockly.ScratchBlocks.VerticalExtensions.FROM_EXTENSION = function() {
+  this.isFromExtension = true;
+};
+
+Blockly.ScratchBlocks.VerticalExtensions.DEFAULT_EXTENSION_COLORS = function() {
+  this.usesDefaultExtensionColors = true;
+};
 
 Blockly.ScratchBlocks.VerticalExtensions.SCRATCH_EXTENSION = function() {
   this.isScratchExtension = true;
 };
+
 /**
  * Register all extensions for scratch-blocks.
  * @package
@@ -258,7 +273,15 @@ Blockly.ScratchBlocks.VerticalExtensions.registerAll = function() {
   Blockly.Extensions.registerMixin('procedure_call_contextmenu',
       Blockly.ScratchBlocks.VerticalExtensions.PROCEDURE_CALL_CONTEXTMENU);
 
-  // Extension blocks have slightly different block rendering.
+  // Given to all blocks from an extension.
+  Blockly.Extensions.register('from_extension',
+      Blockly.ScratchBlocks.VerticalExtensions.FROM_EXTENSION);
+
+  // Given to blocks that use the default extension colors ("pen")
+  Blockly.Extensions.register('default_extension_colors',
+      Blockly.ScratchBlocks.VerticalExtensions.DEFAULT_EXTENSION_COLORS);
+
+  // Misleading name. Given to blocks that have an extension icon.
   Blockly.Extensions.register('scratch_extension',
       Blockly.ScratchBlocks.VerticalExtensions.SCRATCH_EXTENSION);
 };

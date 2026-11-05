@@ -153,12 +153,6 @@ Blockly.ScratchBlockComment.TEXTAREA_OFFSET = 12;
 Blockly.ScratchBlockComment.MAX_LABEL_LENGTH = 12;
 
 /**
- * Maximum character length for comment text.
- * @private
- */
-Blockly.ScratchBlockComment.COMMENT_TEXT_LIMIT = 8000;
-
-/**
  * Width that a minimized comment should have.
  * @private
  */
@@ -226,7 +220,6 @@ Blockly.ScratchBlockComment.prototype.createEditor_ = function() {
   var textarea = document.createElementNS(Blockly.HTML_NS, 'textarea');
   textarea.className = 'scratchCommentTextarea scratchCommentText';
   textarea.setAttribute('dir', this.block_.RTL ? 'RTL' : 'LTR');
-  textarea.setAttribute('maxlength', Blockly.ScratchBlockComment.COMMENT_TEXT_LIMIT);
   textarea.setAttribute('placeholder', Blockly.Msg.WORKSPACE_COMMENT_DEFAULT_TEXT);
   body.appendChild(textarea);
   this.textarea_ = textarea;
@@ -236,7 +229,9 @@ Blockly.ScratchBlockComment.prototype.createEditor_ = function() {
       this.textareaFocus_, true, true); // noCapture and do not prevent default
   // Don't zoom with mousewheel.
   Blockly.bindEventWithChecks_(textarea, 'wheel', this, function(e) {
-    e.stopPropagation();
+    if (!e.ctrlKey && textarea.clientHeight !== textarea.scrollHeight) {
+      e.stopPropagation();
+    }
   });
   Blockly.bindEventWithChecks_(textarea, 'change', this, function(_e) {
     if (this.text_ != textarea.value) {
@@ -261,7 +256,6 @@ Blockly.ScratchBlockComment.prototype.createEditor_ = function() {
  * @private
  */
 Blockly.ScratchBlockComment.prototype.textareaFocus_ = function(e) {
-  Blockly.ScratchBlockComment.superClass_.textareaFocus_.call(this, e);
   // Stop event from propagating to the workspace to make sure preventDefault _is not called_.
   e.stopPropagation();
 };
@@ -313,13 +307,12 @@ Blockly.ScratchBlockComment.prototype.autoPosition_ = function() {
         this.iconXY_.x + minimizedOffset;
     this.y_ = this.iconXY_.y - (Blockly.ScratchBubble.TOP_BAR_HEIGHT / 2);
   } else {
-    // Position comment so that the expanded bubble does not overlap
-    // blocks below it in the stack that are wider than this block
-    // Overhang is the difference between this blocks trailing edge and
-    // the largest block below (zero if this block is the widest)
-    var thisBlockWidth = Math.floor(this.block_.svgPath_.getBBox().width);
-    var fullStackWidth = Math.floor(this.block_.getHeightWidth().width);
-    var overhang = fullStackWidth - thisBlockWidth;
+    // TW: We remove comment overhang entirely. We've found that it tends
+    // to put comments very far away from their target block or even
+    // completely offscreen far too often. Users end up having to move
+    // the comment anyways, so let's do them a favor and not make them
+    // scroll to find the comment.
+    var overhang = 0;
     var offset = 8 * Blockly.BlockSvg.GRID_UNIT;
     this.x_ = this.block_.RTL ?
         this.iconXY_.x - this.width_ - overhang - offset :

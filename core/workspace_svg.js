@@ -50,6 +50,7 @@ goog.require('Blockly.WorkspaceCommentSvg.render');
 goog.require('Blockly.WorkspaceDragSurfaceSvg');
 goog.require('Blockly.Xml');
 goog.require('Blockly.ZoomControls');
+goog.require('Blockly.IntersectionObserver');
 
 goog.require('goog.array');
 goog.require('goog.dom');
@@ -115,6 +116,11 @@ Blockly.WorkspaceSvg = function(options, opt_blockDragSurface, opt_wsDragSurface
       Blockly.DataCategory);
   this.registerToolboxCategoryCallback(Blockly.PROCEDURE_CATEGORY_NAME,
       Blockly.Procedures.flyoutCategory);
+
+  this.procedureReturnsEnabled = Blockly.Procedures.DEFAULT_ENABLE_RETURNS;
+  this.initialProcedureReturnTypes_ = null;
+  this.procedureReturnChangeTimeout_ = null;
+  this.checkProcedureReturnAfterGesture_ = false;
 };
 goog.inherits(Blockly.WorkspaceSvg, Blockly.Workspace);
 
@@ -472,6 +478,8 @@ Blockly.WorkspaceSvg.prototype.createDom = function(opt_backgroundClass) {
     }
   }
 
+  this.intersectionObserver = new Blockly.IntersectionObserver(this);
+
   // Determine if there needs to be a category tree, or a simple list of
   // blocks.  This cannot be changed later, since the UI is very different.
   if (this.options.hasCategories) {
@@ -497,6 +505,10 @@ Blockly.WorkspaceSvg.prototype.dispose = function() {
   this.rendered = false;
   if (this.currentGesture_) {
     this.currentGesture_.cancel();
+  }
+  if (this.intersectionObserver) {
+    this.intersectionObserver.dispose();
+    this.intersectionObserver = null;
   }
   Blockly.WorkspaceSvg.superClass_.dispose.call(this);
   if (this.svgGroup_) {
@@ -550,6 +562,9 @@ Blockly.WorkspaceSvg.prototype.dispose = function() {
   if (this.resizeHandlerWrapper_) {
     Blockly.unbindEvent_(this.resizeHandlerWrapper_);
     this.resizeHandlerWrapper_ = null;
+  }
+  if (this.procedureReturnChangeTimeout_) {
+    clearTimeout(this.procedureReturnChangeTimeout_);
   }
 };
 
@@ -677,6 +692,98 @@ Blockly.WorkspaceSvg.prototype.resizeContents = function() {
   this.updateInverseScreenCTM();
 };
 
+Blockly.WorkspaceSvg.prototype.queueIntersectionCheck = function() {
+  if (this.intersectionObserver) {
+    this.intersectionObserver.queueIntersectionCheck();
+  }
+};
+
+/**
+ * Call *before* modifying scripts.
+ */
+Blockly.WorkspaceSvg.prototype.procedureReturnsWillChange = function() {
+  if (this.initialProcedureReturnTypes_) {
+    // Already queued.
+    return;
+  }
+
+  this.initialProcedureReturnTypes_ = Blockly.Procedures.getAllProcedureReturnTypes(this);
+
+  if (this.currentGesture_) {
+    this.checkProcedureReturnAfterGesture_ = true;
+  } else {
+    this.procedureReturnChangeTimeout_ = setTimeout(this.processProcedureReturnsChanged_.bind(this));
+  }
+};
+
+/**
+ * @private
+ */
+Blockly.WorkspaceSvg.prototype.processProcedureReturnsChanged_ = function() {
+  var initialTypes = this.initialProcedureReturnTypes_;
+  var finalTypes = Blockly.Procedures.getAllProcedureReturnTypes(this);
+
+  this.initialProcedureReturnTypes_ = null;
+  this.checkProcedureReturnAfterGesture_ = false;
+  this.procedureReturnChangeTimeout_ = null;
+
+  Blockly.Events.setGroup(true);
+  var topBlocks = this.getTopBlocks(false);
+  for (var i = 0; i < topBlocks.length; i++) {
+    var block = topBlocks[i];
+    if (block.type !== Blockly.PROCEDURES_CALL_BLOCK_TYPE) continue;
+
+    // After a gesture, we are called early enough that there could still be insertion markers.
+    if (block.isInsertionMarker()) continue;
+
+    // Because this block is a top block, it by definition won't have a parent, but if another
+    // block is connected below, we should leave it unchanged instead of unplugging.
+    if (block.getNextBlock()) continue;
+
+    var procCode = block.getProcCode();
+    // If the procedure doesn't exist or is new, ignore it.
+    if (
+      !Object.prototype.hasOwnProperty.call(initialTypes, procCode) ||
+      !Object.prototype.hasOwnProperty.call(finalTypes, procCode)
+    ) continue;
+
+    var actualReturnType = finalTypes[procCode];
+    if (
+      block.getReturn() !== actualReturnType &&
+      // If user is allowed to override call block shape, only update the shape if the definition's
+      // shape has actually changed.
+      (!Blockly.Procedures.USER_CAN_CHANGE_CALL_TYPE || initialTypes[procCode] !== actualReturnType)
+    ) {
+      Blockly.Procedures.changeReturnType(block, actualReturnType);
+    }
+  }
+  Blockly.Events.setGroup(false);
+
+  // Toolbox refresh can be slow, so only do when needed.
+  var toolboxOutdated = false;
+  for (var procCode in finalTypes) {
+    // If a current procedure existed but its type has changed, the toolbox must be updated.
+    // If a new procedure was created, the toolbox is already updated elsewhere.
+    if (
+      Object.prototype.hasOwnProperty.call(initialTypes, procCode) &&
+      initialTypes[procCode] !== finalTypes[procCode]
+    ) {
+      toolboxOutdated = true;
+      break;
+    }
+  }
+  if (toolboxOutdated) {
+    this.refreshToolboxSelection_();
+  }
+};
+
+/**
+ * Does not refresh toolbox.
+ */
+Blockly.WorkspaceSvg.prototype.enableProcedureReturns = function() {
+  this.procedureReturnsEnabled = true;
+};
+
 /**
  * Resize and reposition all of the workspace chrome (toolbox,
  * trash, scrollbars etc.)
@@ -701,6 +808,7 @@ Blockly.WorkspaceSvg.prototype.resize = function() {
     this.scrollbar.resize();
   }
   this.updateScreenCalculations_();
+  this.queueIntersectionCheck();
 };
 
 /**
@@ -772,6 +880,7 @@ Blockly.WorkspaceSvg.prototype.translate = function(x, y) {
   if (this.blockDragSurface_) {
     this.blockDragSurface_.translateAndScaleGroup(x, y, this.scale);
   }
+  this.queueIntersectionCheck();
 };
 
 /**
@@ -986,7 +1095,7 @@ Blockly.WorkspaceSvg.prototype.reportValue = function(id, value) {
   var contentDiv = Blockly.DropDownDiv.getContentDiv();
   var valueReportBox = goog.dom.createElement('div');
   valueReportBox.setAttribute('class', 'valueReportBox');
-  valueReportBox.innerHTML = Blockly.scratchBlocksUtils.encodeEntities(value);
+  valueReportBox.textContent = value;
   contentDiv.appendChild(valueReportBox);
   Blockly.DropDownDiv.setColour(
       Blockly.Colours.valueReportBackground,
@@ -1020,6 +1129,7 @@ Blockly.WorkspaceSvg.prototype.paste = function(xmlBlock) {
 Blockly.WorkspaceSvg.prototype.pasteBlock_ = function(xmlBlock) {
   Blockly.Events.disable();
   try {
+    Blockly.scratchBlocksUtils.changeCopiedBlockIds(xmlBlock);
     var block = Blockly.Xml.domToBlock(xmlBlock, this);
     // Scratch-specific: Give shadow dom new IDs to prevent duplicating on paste
     Blockly.scratchBlocksUtils.changeObscuredShadowIds(block);
@@ -1805,6 +1915,7 @@ Blockly.WorkspaceSvg.prototype.setScale = function(newScale) {
     // No toolbox, resize flyout.
     this.flyout_.reflow();
   }
+  this.queueIntersectionCheck();
 };
 
 /**
@@ -2215,6 +2326,10 @@ Blockly.WorkspaceSvg.prototype.getGesture = function(e) {
  */
 Blockly.WorkspaceSvg.prototype.clearGesture = function() {
   this.currentGesture_ = null;
+
+  if (this.checkProcedureReturnAfterGesture_) {
+    this.processProcedureReturnsChanged_();
+  }
 };
 
 /**

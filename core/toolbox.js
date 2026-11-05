@@ -40,6 +40,7 @@ goog.require('goog.math.Rect');
 goog.require('goog.style');
 goog.require('goog.ui.tree.TreeControl');
 goog.require('goog.ui.tree.TreeNode');
+goog.require('goog.string');
 
 
 /**
@@ -162,7 +163,8 @@ Blockly.Toolbox.prototype.createFlyout_ = function() {
     oneBasedIndex: workspace.options.oneBasedIndex,
     horizontalLayout: workspace.horizontalLayout,
     toolboxPosition: workspace.options.toolboxPosition,
-    stackGlowFilterId: workspace.options.stackGlowFilterId
+    stackGlowFilterId: workspace.options.stackGlowFilterId,
+    pathToMedia: workspace.options.pathToMedia
   };
 
   if (workspace.horizontalLayout) {
@@ -198,10 +200,10 @@ Blockly.Toolbox.prototype.showAll_ = function() {
     var category = this.categoryMenu_.categories_[i];
 
     // create a label node to go at the top of the category
-    var labelString = '<xml><label text="' + category.name_ + '"' +
-      ' id="' + category.id_ + '"' +
+    var labelString = '<xml><label text="' + goog.string.htmlEscape(category.name_) + '"' +
+      ' id="' + goog.string.htmlEscape(category.id_) + '"' +
       ' category-label="true"' +
-      ' showStatusButton="' + category.showStatusButton_ + '"' +
+      ' showStatusButton="' + goog.string.htmlEscape(category.showStatusButton_) + '"' +
       ' web-class="categoryLabel">' +
       '</label></xml>';
     var labelXML = Blockly.Xml.textToDom(labelString);
@@ -783,12 +785,12 @@ Blockly.Toolbox.Category.prototype.setColour = function(node) {
   var colour = node.getAttribute('colour');
   var secondaryColour = node.getAttribute('secondaryColour');
   if (goog.isString(colour)) {
-    if (colour.match(/^#[0-9a-fA-F]{6}$/)) {
+    if (colour.match(/^#[0-9a-fA-F]{6,8}$/)) {
       this.colour_ = colour;
     } else {
       this.colour_ = Blockly.hueToRgb(colour);
     }
-    if (secondaryColour.match(/^#[0-9a-fA-F]{6}$/)) {
+    if (secondaryColour.match(/^#[0-9a-fA-F]{6,8}$/)) {
       this.secondaryColour_ = secondaryColour;
     } else {
       this.secondaryColour_ = Blockly.hueToRgb(secondaryColour);
