@@ -30,6 +30,20 @@ goog.require('Blockly.Colours');
 goog.require('Blockly.constants');
 goog.require('Blockly.ScratchBlocks.VerticalExtensions');
 
+function _copyCColorIfPossible(sourceBlock, targetBlock) {
+  if (sourceBlock.getCColor && targetBlock.setCColor) {
+    targetBlock.setCColor(sourceBlock.getCColor());
+  } else {
+    if (sourceBlock.blockColor_) {
+      targetBlock.blockColor_ = sourceBlock.blockColor_;
+      targetBlock.setColour(targetBlock.blockColor_);
+      if (targetBlock.updateDisplay_) {
+        targetBlock.updateDisplay_();
+      }
+    }
+  }
+}
+
 // Serialization and deserialization.
 
 Blockly.ScratchBlocks.ProcedureUtils.parseReturnMutation = function(xmlElement) {
@@ -75,6 +89,12 @@ Blockly.ScratchBlocks.ProcedureUtils.callerDomToMutation = function(xmlElement) 
       JSON.parse(xmlElement.getAttribute('generateshadows'));
   this.argumentIds_ = JSON.parse(xmlElement.getAttribute('argumentids'));
   this.warp_ = JSON.parse(xmlElement.getAttribute('warp'));
+  var blockColorAttribute = xmlElement.getAttribute('blockcolor');
+  if (blockColorAttribute) {
+    try{
+    this.blockColor_ = JSON.parse(blockColorAttribute);
+    }catch(e){console.warn(e)}
+  }
   this.return_ = Blockly.ScratchBlocks.ProcedureUtils.parseReturnMutation(xmlElement);
   if (this.return_ !== Blockly.PROCEDURES_CALL_TYPE_STATEMENT) {
     this.workspace.enableProcedureReturns();
@@ -103,6 +123,7 @@ Blockly.ScratchBlocks.ProcedureUtils.definitionMutationToDom = function(
   container.setAttribute('argumentdefaults',
       JSON.stringify(this.argumentDefaults_));
   container.setAttribute('warp', JSON.stringify(this.warp_));
+  container.setAttribute('blockcolor', JSON.stringify(this.blockColor_));
   return container;
 };
 
@@ -115,6 +136,13 @@ Blockly.ScratchBlocks.ProcedureUtils.definitionMutationToDom = function(
 Blockly.ScratchBlocks.ProcedureUtils.definitionDomToMutation = function(xmlElement) {
   this.procCode_ = xmlElement.getAttribute('proccode');
   this.warp_ = JSON.parse(xmlElement.getAttribute('warp'));
+
+  var blockColorAttribute = xmlElement.getAttribute('blockcolor');
+  if (blockColorAttribute) {
+    try{
+    this.blockColor_ = JSON.parse(blockColorAttribute);
+    }catch(e){console.warn(e)}
+  }
 
   var prevArgIds = this.argumentIds_;
   var prevDisplayNames = this.displayNames_;
@@ -150,6 +178,11 @@ Blockly.ScratchBlocks.ProcedureUtils.getProcCode = function() {
  * @this Blockly.Block
  */
 Blockly.ScratchBlocks.ProcedureUtils.updateDisplay_ = function() {
+  if (!this._colorBeforeUpdate) {
+    this._colorBeforeUpdate = this.getColour();
+    //console.log(this._colorBeforeUpdate);
+  }
+  
   var wasRendered = this.rendered;
   this.rendered = false;
 
@@ -158,6 +191,24 @@ Blockly.ScratchBlocks.ProcedureUtils.updateDisplay_ = function() {
 
   this.createAllInputs_(connectionMap);
   this.deleteShadows_(connectionMap);
+  
+  if (this.blockColor_) {
+    this.setColour(this.blockColor_);
+  } else {
+    this.setColour(this._colorBeforeUpdate);
+  }
+  if (
+      this.outputConnection && 
+      this.outputConnection.targetConnection && 
+      this.outputConnection.targetConnection.sourceBlock_.type === 'procedures_definition_return') {
+    this.outputConnection.targetConnection.sourceBlock_.setColour(this.blockColor_)
+  }
+  if (
+      this.previousConnection && 
+      this.previousConnection.targetConnection && 
+      this.previousConnection.targetConnection.sourceBlock_.type === 'procedures_definition') {
+    this.previousConnection.targetConnection.sourceBlock_.setColour(this.blockColor_)
+  }
 
   if (!wasRendered && this.getReturn) {
     this.setInputsInline(true);
@@ -180,6 +231,7 @@ Blockly.ScratchBlocks.ProcedureUtils.updateDisplay_ = function() {
     this.initSvg();
     this.render();
   }
+
 };
 
 /**
@@ -416,6 +468,7 @@ Blockly.ScratchBlocks.ProcedureUtils.createArgumentReporter_ = function(
   try {
     var newBlock = this.workspace.newBlock(blockType);
     newBlock.setShadow(true);
+    _copyCColorIfPossible(this, newBlock);
     newBlock.setFieldValue(displayName, 'VALUE');
     if (!this.isInsertionMarker()) {
       newBlock.initSvg();
@@ -451,6 +504,9 @@ Blockly.ScratchBlocks.ProcedureUtils.populateArgumentOnCaller_ = function(type,
     oldBlock = saveInfo['block'];
     oldShadow = saveInfo['shadow'];
   }
+
+  _copyCColorIfPossible(oldBlock, oldBlock);
+  _copyCColorIfPossible(oldBlock, this);
 
   if (connectionMap && oldBlock) {
     // Reattach the old block and shadow DOM.
@@ -591,6 +647,9 @@ Blockly.ScratchBlocks.ProcedureUtils.createArgumentEditor_ = function(
     } else {
       var newBlock = this.workspace.newBlock('argument_editor_boolean');
     }
+    if (argumentType == "c") {
+      _copyCColorIfPossible(this, newBlock);
+    }
     newBlock.setFieldValue(displayName, 'TEXT');
     newBlock.setShadow(true);
     if (!this.isInsertionMarker()) {
@@ -705,6 +764,14 @@ Blockly.ScratchBlocks.ProcedureUtils.getWarp = function() {
   return this.warp_;
 };
 
+Blockly.ScratchBlocks.ProcedureUtils.getCColor = function() {
+  return this.blockColor_;
+};
+
+Blockly.ScratchBlocks.ProcedureUtils.usesCColor = function() {
+  return !!this.blockColor_;
+};
+
 /**
  * Externally-visible function to set the warp on procedure declaration.
  * @param {boolean} warp The value of the warp_ property.
@@ -712,6 +779,16 @@ Blockly.ScratchBlocks.ProcedureUtils.getWarp = function() {
  */
 Blockly.ScratchBlocks.ProcedureUtils.setWarp = function(warp) {
   this.warp_ = warp;
+};
+
+Blockly.ScratchBlocks.ProcedureUtils.setCColor = function(color) {
+  this.blockColor_ = color;
+  this.updateDisplay_();
+};
+
+Blockly.ScratchBlocks.ProcedureUtils.disableCColor = function() {
+  this.blockColor_ = null;
+  this.updateDisplay_();
 };
 
 /**
@@ -855,7 +932,12 @@ Blockly.Blocks['procedures_call'] = {
     this.procCode_ = '';
     this.argumentIds_ = [];
     this.warp_ = false;
+    this.blockColor_ = null;
     this.return_ = Blockly.PROCEDURES_CALL_TYPE_STATEMENT;
+
+    if (this.workspace) {
+      //console.log(this.workspace);
+    }
   },
   // Shared.
   getProcCode: Blockly.ScratchBlocks.ProcedureUtils.getProcCode,
@@ -871,6 +953,9 @@ Blockly.Blocks['procedures_call'] = {
   domToMutation: Blockly.ScratchBlocks.ProcedureUtils.callerDomToMutation,
   populateArgument_: Blockly.ScratchBlocks.ProcedureUtils.populateArgumentOnCaller_,
   addProcedureLabel_: Blockly.ScratchBlocks.ProcedureUtils.addLabelField_,
+
+  getCColor: Blockly.ScratchBlocks.ProcedureUtils.getCColor,
+  setCColor: Blockly.ScratchBlocks.ProcedureUtils.setCColor,
 
   // Only exists on the external caller.
   attachShadow_: Blockly.ScratchBlocks.ProcedureUtils.attachShadow_,
@@ -894,7 +979,17 @@ Blockly.Blocks['procedures_prototype'] = {
     this.argumentIds_ = [];
     this.argumentDefaults_ = [];
     this.warp_ = false;
+    this.blockColor_ = null;
+
+    queueMicrotask(() => {
+      if (this.parentBlock_) _copyCColorIfPossible(this, this.parentBlock_);
+      _copyCColorIfPossible(this, this);
+      if (this.childBlocks_) for (const block of this.childBlocks_) _copyCColorIfPossible(this, block);
+    });
   },
+
+  getCColor: Blockly.ScratchBlocks.ProcedureUtils.getCColor,
+  setCColor: Blockly.ScratchBlocks.ProcedureUtils.setCColor,
   // Shared.
   getProcCode: Blockly.ScratchBlocks.ProcedureUtils.getProcCode,
   removeAllInputs_: Blockly.ScratchBlocks.ProcedureUtils.removeAllInputs_,
@@ -929,6 +1024,7 @@ Blockly.Blocks['procedures_declaration'] = {
     this.argumentIds_ = [];
     this.argumentDefaults_ = [];
     this.warp_ = false;
+    this.blockColor_ = null;
   },
   // Shared.
   getProcCode: Blockly.ScratchBlocks.ProcedureUtils.getProcCode,
@@ -952,6 +1048,10 @@ Blockly.Blocks['procedures_declaration'] = {
   focusLastEditor_: Blockly.ScratchBlocks.ProcedureUtils.focusLastEditor_,
   getWarp: Blockly.ScratchBlocks.ProcedureUtils.getWarp,
   setWarp: Blockly.ScratchBlocks.ProcedureUtils.setWarp,
+  getCColor: Blockly.ScratchBlocks.ProcedureUtils.getCColor,
+  setCColor: Blockly.ScratchBlocks.ProcedureUtils.setCColor,
+  usesCColor: Blockly.ScratchBlocks.ProcedureUtils.usesCColor,
+  disableCColor: Blockly.ScratchBlocks.ProcedureUtils.disableCColor,
   addLabelExternal: Blockly.ScratchBlocks.ProcedureUtils.addLabelExternal,
   addBooleanExternal: Blockly.ScratchBlocks.ProcedureUtils.addBooleanExternal,
   addStringNumberExternal: Blockly.ScratchBlocks.ProcedureUtils.addStringNumberExternal,
