@@ -23,6 +23,8 @@ python_compressed.js
 # Editor
 .vscode
 
+yarn.lock
+
 /accessible/*
 /dist
 /msg/js/*
@@ -44,3 +46,4 @@ python_compressed.js
 /*compiler*.jar
 /local_blockly_compressed_vertical.js
 /chromedriver
+
