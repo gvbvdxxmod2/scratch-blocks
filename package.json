@@ -16,7 +16,6 @@
     "prepare": "echo Prepared",
     "prepublish": "python build.py && webpack",
     "build": "npm run prepublish",
-    "postinstall": "npm run build",
     "test": "npm run test:messages && npm run test:unit",
     "test:lint": "eslint .",
     "test:messages": "npm run translate && node i18n/test_scratch_msgs.js",
